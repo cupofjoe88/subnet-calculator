@@ -49,48 +49,70 @@
         <label>Label for category #${categoryCount}</label>
         <input type="text" class="label" placeholder="e.g. Computers">
         <label>Subnet size (CIDR):</label>
-        <input type="number" class="prefix" placeholder="e.g. 28">
+        <input type="number" class="prefix" placeholder="e.g. 28" min="1" max="32">
       `;
       document.getElementById('categories').appendChild(div);
     }
 
     function ipToInt(ip) {
-      return ip.split('.').reduce((int, oct) => (int << 8) + parseInt(oct), 0);
+      const parts = ip.split('.');
+      if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
+        throw new Error("Invalid IP address");
+      }
+      return parts.reduce((int, oct) => (int << 8) + parseInt(oct, 10), 0);
     }
 
     function intToIp(int) {
-      return [(int >>> 24), (int >> 16 & 255), (int >> 8 & 255), (int & 255)].join('.');
+      return [
+        (int >>> 24) & 255,
+        (int >>> 16) & 255,
+        (int >>> 8) & 255,
+        int & 255
+      ].join('.');
     }
 
     function calculateSubnets() {
-      const cidrInput = document.getElementById('cidr').value.trim();
-      const [baseIp, basePrefix] = cidrInput.split('/');
-      const base = ipToInt(baseIp);
-      const basePrefixNum = parseInt(basePrefix);
+      let output = document.getElementById('output');
+      output.innerHTML = '';
+      try {
+        const cidrInput = document.getElementById('cidr').value.trim();
+        const [baseIp, basePrefix] = cidrInput.split('/');
+        const base = ipToInt(baseIp);
+        const basePrefixNum = parseInt(basePrefix);
 
-      const totalIps = 2 ** (32 - basePrefixNum);
-      let current = base;
-      let results = '';
-
-      const labels = Array.from(document.querySelectorAll('.label')).map(el => el.value.trim());
-      const prefixes = Array.from(document.querySelectorAll('.prefix')).map(el => parseInt(el.value));
-
-      for (let i = 0; i < labels.length; i++) {
-        const label = labels[i];
-        const newPrefix = prefixes[i];
-        const size = 2 ** (32 - newPrefix);
-
-        if (current + size > base + totalIps) {
-          results += `<p><strong>${label}:</strong> Not enough IP space available for /${newPrefix}</p>`;
-        } else {
-          const startIp = intToIp(current);
-          const endIp = intToIp(current + size - 1);
-          results += `<p><strong>${label}:</strong> ${startIp}/${newPrefix} (${startIp} - ${endIp})</p>`;
-          current += size;
+        if (isNaN(basePrefixNum) || basePrefixNum < 0 || basePrefixNum > 32) {
+          throw new Error("Invalid CIDR prefix");
         }
-      }
 
-      document.getElementById('output').innerHTML = results;
+        const totalIps = 2 ** (32 - basePrefixNum);
+        let current = base;
+
+        const labels = Array.from(document.querySelectorAll('.label')).map(el => el.value.trim());
+        const prefixes = Array.from(document.querySelectorAll('.prefix')).map(el => parseInt(el.value));
+
+        for (let i = 0; i < labels.length; i++) {
+          const label = labels[i];
+          const newPrefix = prefixes[i];
+
+          if (isNaN(newPrefix) || newPrefix < 0 || newPrefix > 32) {
+            output.innerHTML += `<p><strong>${label || 'Unnamed'}:</strong> Invalid subnet prefix /${newPrefix}</p>`;
+            continue;
+          }
+
+          const size = 2 ** (32 - newPrefix);
+
+          if (current + size > base + totalIps) {
+            output.innerHTML += `<p><strong>${label || 'Unnamed'}:</strong> Not enough IP space available for /${newPrefix}</p>`;
+          } else {
+            const startIp = intToIp(current);
+            const endIp = intToIp(current + size - 1);
+            output.innerHTML += `<p><strong>${label || 'Unnamed'}:</strong> ${startIp}/${newPrefix} (${startIp} - ${endIp})</p>`;
+            current += size;
+          }
+        }
+      } catch (err) {
+        output.innerHTML = `<p style="color:red;"><strong>Error:</strong> ${err.message}</p>`;
+      }
     }
   </script>
 </body>
