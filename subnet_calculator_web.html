@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Subnet Calculator</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    input, select, button {
+      margin: 5px 0;
+      padding: 8px;
+      width: 100%;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      background: #f9f9f9;
+    }
+    .category {
+      margin-bottom: 10px;
+      border-bottom: 1px solid #ddd;
+      padding-bottom: 10px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Subnet Calculator</h1>
+  <label>Main CIDR Block:</label>
+  <input type="text" id="cidr" placeholder="e.g. 192.168.0.0/24">
+
+  <div id="categories"></div>
+  <button onclick="addCategory()">Add Category</button>
+  <button onclick="calculateSubnets()">Calculate Subnets</button>
+
+  <div id="output" class="result"></div>
+
+  <script>
+    let categoryCount = 0;
+
+    function addCategory() {
+      categoryCount++;
+      const div = document.createElement('div');
+      div.className = 'category';
+      div.innerHTML = `
+        <label>Label for category #${categoryCount}</label>
+        <input type="text" class="label" placeholder="e.g. Computers">
+        <label>Subnet size (CIDR):</label>
+        <input type="number" class="prefix" placeholder="e.g. 28">
+      `;
+      document.getElementById('categories').appendChild(div);
+    }
+
+    function ipToInt(ip) {
+      return ip.split('.').reduce((int, oct) => (int << 8) + parseInt(oct), 0);
+    }
+
+    function intToIp(int) {
+      return [(int >>> 24), (int >> 16 & 255), (int >> 8 & 255), (int & 255)].join('.');
+    }
+
+    function calculateSubnets() {
+      const cidrInput = document.getElementById('cidr').value.trim();
+      const [baseIp, basePrefix] = cidrInput.split('/');
+      const base = ipToInt(baseIp);
+      const basePrefixNum = parseInt(basePrefix);
+
+      const totalIps = 2 ** (32 - basePrefixNum);
+      let current = base;
+      let results = '';
+
+      const labels = Array.from(document.querySelectorAll('.label')).map(el => el.value.trim());
+      const prefixes = Array.from(document.querySelectorAll('.prefix')).map(el => parseInt(el.value));
+
+      for (let i = 0; i < labels.length; i++) {
+        const label = labels[i];
+        const newPrefix = prefixes[i];
+        const size = 2 ** (32 - newPrefix);
+
+        if (current + size > base + totalIps) {
+          results += `<p><strong>${label}:</strong> Not enough IP space available for /${newPrefix}</p>`;
+        } else {
+          const startIp = intToIp(current);
+          const endIp = intToIp(current + size - 1);
+          results += `<p><strong>${label}:</strong> ${startIp}/${newPrefix} (${startIp} - ${endIp})</p>`;
+          current += size;
+        }
+      }
+
+      document.getElementById('output').innerHTML = results;
+    }
+  </script>
+</body>
+</html>
